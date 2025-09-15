@@ -14,12 +14,12 @@ public class MarkTestStatus {
     public void test() throws Exception {
         String status = getPercyBuildStatus();
 
-        if(status.equals("finished")){
+        if(!status.equals("unreviewed")){
             setSessionStatus("passed","Percy Build has been successfully completed!");
         }else if(status.contains("forbidden")){
             setSessionStatus("failed","Something went wrong! Check if Percy Token and Build Id is correct. API Status: "+status);
         }else{
-            setSessionStatus("failed","Percy Build has failed!");
+            setSessionStatus("failed","Percy build has unreviewed snapshots!");
         }
     }
     public String getPercyBuildStatus() throws IOException {
@@ -40,8 +40,8 @@ public class MarkTestStatus {
         try{
             dataJSON = new JSONObject(apiResponseJSON.get("data").toString());
             attributesJSON = new JSONObject(dataJSON.get("attributes").toString());
-            System.out.println("State:"+attributesJSON.get("state").toString());
-            return attributesJSON.get("state").toString();
+            System.out.println("State:"+attributesJSON.get("review-state").toString());
+            return attributesJSON.get("review-state").toString();
         }catch (JSONException jsonException){
             System.out.println("Something went wrong! Check if Percy Token and Build Id is correct. API Status: "+apiResponseJSON.get("errors"));
             return apiResponseJSON.get("errors").toString();

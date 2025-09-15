@@ -1,6 +1,8 @@
 import io.percy.selenium.Percy;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.DesiredCapabilities;
@@ -8,13 +10,17 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.SessionId;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -25,15 +31,20 @@ public class TestCase {
         String accesskey =  System.getenv("BROWSERSTACK_ACCESS_KEY");
         ArrayList<Integer> widths = new ArrayList();
 
-        DesiredCapabilities capabilities = new DesiredCapabilities();
-        capabilities.setCapability("browser","Chrome");
-        capabilities.setCapability("browser_version","latest");
-        capabilities.setCapability("os","Windows");
-        capabilities.setCapability("os_version","10");
-        capabilities.setCapability("build","Bstack Percy Integration");
-        capabilities.setCapability("name","test");
+        MutableCapabilities capabilities = new MutableCapabilities();
+        HashMap<String, Object> bstackOptions = new HashMap<String, Object>();
+        capabilities.setCapability("browserName", "Chrome");
+        bstackOptions.put("os", "Windows");
+        bstackOptions.put("osVersion", "10");
+        bstackOptions.put("browserVersion", "120.0");
+        bstackOptions.put("consoleLogs", "info");
+        bstackOptions.put("projectName", "Elsevier");
+        bstackOptions.put("buildName", "Percy Status Sync");
+        bstackOptions.put("sessionName", "sampleTest"); 
+        capabilities.setCapability("bstack:options", bstackOptions);
+
         WebDriver driver = new RemoteWebDriver(new URL("https://"+username+":"+accesskey+"@hub.browserstack.com/wd/hub"),capabilities);
-        driver.manage().timeouts().pageLoadTimeout(50, TimeUnit.SECONDS);
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
         driver.manage().window().maximize();
 
         try{
@@ -41,36 +52,44 @@ public class TestCase {
             SessionId sessionId = ((RemoteWebDriver)driver).getSessionId();
             storeSessionID(sessionId.toString());
 
-            driver.get("https://diagnostics.roche.com/us/en/products/instruments/cobas-c-311-ins-2043.html#productSpecs");
-            WebDriverWait wait = new WebDriverWait(driver, 30);
-            WebElement acceptButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("onetrust-accept-btn-handler")));
-            acceptButton.click();
-            keepScrolling(driver);
+            driver.get("https://bstackdemo.com/");
+            percySnapshots.snapshot("Homepage", widths);
+            driver.findElement(By.id("signin")).click();
+            driver.findElement(By.cssSelector("#username input")).sendKeys("image_not_loading_user", Keys.ENTER);
+            driver.findElement(By.cssSelector("#password input")).sendKeys("testingisfun99", Keys.ENTER);
+            driver.findElement(By.id("login-btn")).click();
+            String productName = "iPhone 12";
+            List<WebElement> allProductsList = driver.findElements(By.cssSelector(".shelf-item"));
+            for(int i=0;i<allProductsList.size();i++){
+                WebElement selectProduct = allProductsList.get(i);
+                if(selectProduct.findElement(By.cssSelector(".shelf-item__title")).getText().equals(productName)){
+                    selectProduct.findElement(By.cssSelector(".shelf-item__buy-btn")).click();
+                    System.out.println(productName + " added to bag!");
+                    break;
+                }else{
+                    continue;
+                }
+            }
+            //driver.findElement(By.cssSelector(".float-cart__close-btn")).click();
+            driver.findElement(By.cssSelector(".buy-btn")).click();
+            driver.findElement(By.id("firstNameInput")).sendKeys("Nithya");
+            driver.findElement(By.id("lastNameInput")).sendKeys("Mani");
+            driver.findElement(By.id("addressLine1Input")).sendKeys("Mumbai");
+            driver.findElement(By.id("provinceInput")).sendKeys("Maharashtra");
+            driver.findElement(By.id("postCodeInput")).sendKeys("400080");
+            driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-            percySnapshots.snapshot("Product Specs Tab",null, null, false, "div[class='timeline-Viewport']{ visibility: hidden}");
-            driver.get("https://diagnostics.roche.com/us/en/products/instruments/cobas-c-311-ins-2043.html#assay");
-            keepScrolling(driver);
-            percySnapshots.snapshot("Product Assay Menu Tab", null, null, false, "div[class='timeline-Viewport']{ visibility: hidden}");
+            String confirmationMessage = driver.findElement(By.id("confirmation-message")).getText();
+            String orderId = driver.findElement(By.cssSelector(".checkout-form div:nth-child(2) strong")).getText();
+            Assert.assertTrue(confirmationMessage.contains("successfully"));
+            percySnapshots.snapshot("Checkout page", widths);
         }catch (ClassCastException e){
             System.out.printf(e.getMessage());
         }
 
         driver.quit();
     }
-    public void keepScrolling(WebDriver driver){
-        JavascriptExecutor js = (JavascriptExecutor) driver;
-        js.executeScript("window.scrollBy(0,400)");
-        js.executeScript("window.scrollBy(400,800)");
-        js.executeScript("window.scrollBy(800,1200)");
-        js.executeScript("window.scrollBy(1200,1600)");
-        js.executeScript("window.scrollBy(1600,2000)");
-        js.executeScript("window.scrollBy(2000,2400)");
-        js.executeScript("window.scrollBy(2400,2800)");
-        js.executeScript("window.scrollBy(2800,3200)");
-        js.executeScript("window.scrollBy(3200,3600)");
-        js.executeScript("window.scrollBy(3600,4000)");
-        js.executeScript("window.scrollBy(0,0)");
-    }
+
     public void storeSessionID(String sessionID) throws IOException {
         try (OutputStream output = new FileOutputStream("src/test/resources/session-data/currentSessionID.properties")) {
             Properties prop = new Properties();
